@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package extension
+        run: |
+          set -euo pipefail
+          PKG="bjtu-video-player-fix-${GITHUB_REF_NAME}"
+          mkdir -p "dist/${PKG}"
+          cp extension/manifest.json "dist/${PKG}/"
+          cp extension/injected.js "dist/${PKG}/"
+          cd dist
+          zip -r "../${PKG}.zip" "${PKG}"
+          cd ..
+          ls -lh "${PKG}.zip"
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          NOTES=".github/release-notes/${GITHUB_REF_NAME}.md"
+          TITLE_FILE=".github/release-notes/${GITHUB_REF_NAME}.title"
+          PKG="bjtu-video-player-fix-${GITHUB_REF_NAME}.zip"
+
+          if [ ! -f "$NOTES" ]; then
+            echo "missing release notes: $NOTES" >&2
+            exit 1
+          fi
+
+          TITLE="${GITHUB_REF_NAME}"
+          if [ -f "$TITLE_FILE" ]; then
+            TITLE="$(cat "$TITLE_FILE")"
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "$TITLE" \
+            --notes-file "$NOTES" \
+            "$PKG"
