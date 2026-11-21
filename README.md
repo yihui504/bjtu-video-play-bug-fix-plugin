@@ -5,6 +5,8 @@
 A small browser extension that fixes the playback problems on the Beijing Jiaotong
 University (BJTU) Party education platform — 「党旗飘飘」, `jjfzpx.bjtu.edu.cn`.
 
+![Extension panel while a video is playing](docs/img/playing.png)
+
 ---
 
 ## Why this exists
@@ -71,6 +73,9 @@ Type `chrome://extensions` in the address bar (or `edge://extensions` in Edge):
 
 ![Load unpacked](docs/img/install-1.png)
 
+*The red arrows mark the two buttons you need: **加载未打包的扩展程序 / Load unpacked** at
+the top, and the reload icon on the extension card (used after updating the files).*
+
 **3. Turn on Developer mode**
 
 Toggle **开发者模式 / Developer mode** in the top-right corner.
@@ -91,6 +96,8 @@ corner once a video page is loaded.
 ## Usage
 
 ![Panel](docs/img/panel.png)
+
+*The arrows point at the two controls described below.*
 
 The panel has two controls in its title bar:
 

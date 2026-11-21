@@ -5,6 +5,8 @@
 一个浏览器扩展，用于修复北京交通大学党员教育培训平台（「党旗飘飘」，
 `jjfzpx.bjtu.edu.cn`）播放器的体验问题。
 
+![视频播放中的状态面板](docs/img/playing.png)
+
 ---
 
 ## 项目缘起
@@ -66,6 +68,9 @@ git clone https://github.com/yihui504/bjtu-video-play-bug-fix-plugin.git
 
 ![加载未打包的扩展程序](docs/img/install-1.png)
 
+*图中红色箭头标出了两个关键位置：上方的 **加载未打包的扩展程序** 按钮，以及扩展卡片上的
+刷新图标（更新文件后点它重新加载）。*
+
 **3. 打开开发者模式**
 
 点击右上角的 **开发者模式** 开关。
@@ -82,6 +87,8 @@ git clone https://github.com/yihui504/bjtu-video-play-bug-fix-plugin.git
 ## 使用说明
 
 ![状态面板](docs/img/panel.png)
+
+*图中箭头对应下表的两个开关。*
 
 面板标题栏右侧有两个开关：
 
