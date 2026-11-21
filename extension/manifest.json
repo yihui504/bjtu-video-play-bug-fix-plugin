@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "党旗飘飘 · 播放修复",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "description": "修复北京交通大学党员教育培训平台（党旗飘飘）播放器的体验问题：切到后台即暂停、定时弹窗打断、随机跳回首页、进度条锁定、右键与 F12 被禁。可选自动续播（默认关闭）。仅作用于 jjfzpx.bjtu.edu.cn。",
   "content_scripts": [
     {

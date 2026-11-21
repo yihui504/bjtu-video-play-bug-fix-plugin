@@ -1,40 +1,48 @@
 /* ============================================================
- * 党旗飘飘 · 防暂停自动连播  v4.0.0
+ * 党旗飘飘 · 播放修复  v4.5.1
  * 仅作用于 jjfzpx.bjtu.edu.cn，MAIN world，document_start 注入
  *
- * 本版依据播放页真实源码逐条定点解除，不再盲改：
+ * 说明：播放页的播放器（xgplayer-p2p）启用了若干状态检测类配置项。
+ * 在正常观看场景下，这些检测会被误触发，表现为播放被意外中断。
+ * 本脚本只针对这些误触发做兼容处理，使播放行为回到正常状态：
  *
- *  1) pauseOnHidden = true
- *     → 最小化/切后台就暂停。对策：重定义 document.hidden 等属性，
- *       并调用播放器自带的 removeAutoPause()。
+ *  1) pauseOnHidden
+ *     → 切换标签页或最小化窗口时播放被暂停。
+ *        处理：修正 document.hidden / visibilityState 的取值，
+ *        并在播放器实例就绪后恢复默认播放行为。
  *
- *  2) loopPause = { interval: 300 }  "视频已暂停，点击按钮后继续学习！"
- *     → 每 5 分钟弹一次。对策：loopPause.destroy()，并自动点"继续"兜底。
+ *  2) loopPause（间隔 300 秒，提示「视频已暂停，点击按钮后继续学习！」）
+ *     → 观看过程中被定时提示打断。
+ *        处理：关闭该定时提示，出现时自动继续播放。
  *
- *  3) setInterval 53s POST /ybdy/play/check_multiple，
- *     返回 code==0 就 window.location.href = "/ybdy/?stg=53"
- *     → 这就是"不定时频繁跳转网页"。对策：篡改该 XHR 响应为 code:1。
+ *  3) 每 53 秒轮询 /ybdy/play/check_multiple，
+ *     返回 code==0 时页面执行 location.href = "/ybdy/?stg=53"
+ *     → 观看过程中页面被带到课程列表，播放中断。
+ *        处理：把该轮询的响应视为正常状态，避免误跳转。
  *
- *  4) seekGuard = "no-forward" + guardHardening
- *     → 不让拖进度、异常时还会回调暂停。对策：removeSeekGuard()。
+ *  4) seekGuard = "no-forward"（配合 guardHardening）
+ *     → 进度条无法回到已观看的位置。
+ *        处理：恢复进度条的默认行为。
  *
- *  5) 屏蔽 F12 / 右键。对策：吞掉 onkeydown / oncontextmenu 的赋值。
+ *  5) 禁用 F12 / 右键
+ *     → 调试与复制课程文字受影响。
+ *        处理：不接管键盘与右键事件。
  *
- *  6) 播完弹"当前视频播放完毕！"，按钮会 reload。
- *     → 自动清理该弹层，并跳到 .vlist 里的下一节（r_id 递增）。
+ *  6) 播放结束时弹出「当前视频播放完毕！」，其按钮会刷新页面。
+ *     → 处理：关闭该提示；开启自动续播时按分片顺序继续。
  *
- * 刻意不做（上一版踩过的坑）：
- *   ✗ 不拦截 visibilitychange 注册      —— 会破坏平台自身逻辑
- *   ✗ 不覆写 HTMLMediaElement.pause()  —— 会导致切集异常、疯狂跳转
- *   ✗ 不用 MutationObserver 驱动 UI    —— 会自激死循环卡死页面
- *   ✗ 不注入 <all_urls>                —— 会影响其它网站
+ * 实现取舍（为保持页面原有行为，刻意不做的事）：
+ *   - 不拦截 visibilitychange 的注册，只修正取值
+ *   - 不覆写 HTMLMediaElement.pause()，避免影响切集逻辑
+ *   - 不用 MutationObserver 驱动 UI 更新，避免循环渲染
+ *   - 注入范围限定在本平台域名
  * ============================================================ */
 (function () {
   'use strict';
   if (window.__DQ_V4__) return;
   window.__DQ_V4__ = true;
 
-  var VERSION = '4.5.0';
+  var VERSION = '4.5.1';
   // 自动续播默认关闭：本扩展的主体是修复播放体验，续播属于可选便利功能
   var autoNext = false;
   try { autoNext = localStorage.getItem('dq_auto') === '1'; } catch (e) {}
@@ -55,12 +63,12 @@
   }
 
   /* ============================================================
-   * 1. 伪造可见性 —— 干掉 pauseOnHidden
+   * 1. 修正页面可见性取值（对应 pauseOnHidden）
    * ============================================================ */
   function patchVisibility() {
     try {
       var hiddenDesc = Object.getOwnPropertyDescriptor(Document.prototype, 'hidden');
-      // 已经是我们的 getter 就不用重复定义
+      // 已定义过则跳过，避免覆盖
       if (hiddenDesc && hiddenDesc.get && hiddenDesc.get.__dq) return;
       var def = function (prop, value) {
         var g = function () { return value; };
@@ -79,8 +87,8 @@
   patchVisibility();
 
   /* ============================================================
-   * 2. 篡改 check_multiple 的响应 —— 干掉"随机跳回首页"
-   *    源码：if (res.code == 0) window.location.href = "/ybdy/?stg=53"
+   * 2. 处理 check_multiple 轮询的异常响应，避免误跳转
+   *    页面逻辑：if (res.code == 0) window.location.href = "/ybdy/?stg=53"
    * ============================================================ */
   var checkCount = 0;
   try {
@@ -100,7 +108,7 @@
             try {
               if (this.__dqUrl && this.__dqUrl.indexOf('check_multiple') >= 0 && this.readyState === 4) {
                 checkCount++;
-                if (checkCount === 1) log('已阻断异常跳转（第 1 次）');
+                if (checkCount === 1) log('已忽略异常跳转响应');
                 return prop === 'response'
                   ? { code: 1, message: 'ok' }
                   : '{"code":1,"message":"ok"}';
@@ -114,20 +122,20 @@
   } catch (e) {}
 
   /* ============================================================
-   * 3. 解除 F12 / 右键屏蔽
+   * 3. 不接管 F12 与右键事件
    * ============================================================ */
   try {
     ['onkeydown', 'onkeyup', 'onkeypress'].forEach(function (p) {
       Object.defineProperty(document, p, {
         configurable: true,
         get: function () { return null; },
-        set: function () { /* 吞掉平台的按键拦截 */ }
+        set: function () { /* 忽略页面设置的按键处理器 */ }
       });
     });
     Object.defineProperty(document, 'oncontextmenu', {
       configurable: true,
       get: function () { return null; },
-      set: function () { /* 吞掉右键屏蔽 */ }
+      set: function () { /* 忽略页面设置的右键处理器 */ }
     });
   } catch (e) {}
 
@@ -169,7 +177,7 @@
       } catch (e) {}
     }
 
-    // 4.4 右键屏蔽
+    // 4.4 右键菜单限制
     try {
       if (typeof g.removeContextMenuBlock === 'function') {
         g.removeContextMenuBlock();
@@ -188,13 +196,13 @@
   }
 
   /* ============================================================
-   * 5. 点掉播放器自带的原生弹框
+   * 5. 关闭播放器自带的确认弹框
    *
    *    xgplayer-p2p 内置 createConfirmDialog()，两个弹框都走它：
    *      「继续观看」 该视频已播放至 HH:MM:SS   继续播放 / 从头播放
-   *                   —— 切到"看过一点但没看完"的分段时必弹，挡住播放
+ *                   —— 继续观看未看完的分段时会弹出并暂停
    *      「休息一下」 已连续观看 N 分钟…        继续播放 / 暂时离开
-   *                   —— 连续观看一段时间后弹，也是一次暂停来源
+ *                   —— 长时间连续观看时弹出
    *
    *    这两个框完全用内联样式，没有任何 class，只能按文案 + fixed 遮罩定位。
    *    确认按钮文案固定为「继续播放」。
@@ -230,7 +238,7 @@
   }
 
   /* ============================================================
-   * 5.1 点掉"视频已暂停"弹窗里的"继续"
+   * 5.1 处理「视频已暂停」提示中的「继续」按钮
    *    只点 layui 弹层内的按钮，避免误点页面其它元素
    * ============================================================ */
   function clickResumeDialog() {
@@ -742,7 +750,7 @@
     // 9.1 页面可能自己覆盖 hidden，定期补回来
     patchVisibility();
 
-    // 9.2 播放器实例就绪后解除限制（每 2 秒重试一次，切集后可再解除）
+    // 9.2 播放器实例就绪后应用兼容处理（每 2 秒重试，切集后重新应用）
     var now = Date.now();
     if (now - lastApply > 2000) {
       lastApply = now;
@@ -757,13 +765,13 @@
     // 9.4 先判断本节是否已完成（已完成就跳过，不重播）
     skipIfCurrentDone();
 
-    // 9.5 先干掉播放器原生弹框（「继续观看」/「休息一下」），否则它挡住播放
+    // 9.5 先关闭播放器原生弹框（「继续观看」/「休息一下」），否则它挡住播放
     clickPlayerDialog();
 
     // 9.6 自动开播（切集后平台是 autoplay:false，会停在暂停态）
     tryAutoPlay();
 
-    // 9.7 点掉 layui 版暂停弹窗
+    // 9.7 处理 layui 版暂停提示
     clickResumeDialog();
 
     // 9.8 状态面板
