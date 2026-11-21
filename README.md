@@ -58,7 +58,7 @@ a video can play through without being cut off.
 **1. Get the files**
 
 ```bash
-git clone https://github.com/yihui504/bjtu-vedio-play-bug-fix-plugin.git
+git clone https://github.com/yihui504/bjtu-video-play-bug-fix-plugin.git
 ```
 
 Or use **Code → Download ZIP** and unzip it. The layout looks like this:

@@ -53,7 +53,7 @@
 **1. 获取文件**
 
 ```bash
-git clone https://github.com/yihui504/bjtu-vedio-play-bug-fix-plugin.git
+git clone https://github.com/yihui504/bjtu-video-play-bug-fix-plugin.git
 ```
 
 或者在仓库页点 **Code → Download ZIP** 后解压。目录结构如下：
